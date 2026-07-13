@@ -1,335 +1,308 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Subway Runner</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    :root {
-      --bg: var(--tg-theme-bg-color, #1a1a1a);
-      --text: var(--tg-theme-text-color, #ffffff);
-      --accent: var(--tg-theme-button-color, #ff4757);
-    }
-    body {
-      margin: 0;
-      padding: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      overflow: hidden;
-      touch-action: none;
-    }
+    <meta charset="UTF-8">
+    <title>Крестики-Нолики TWA</title>
+    <!-- Подключение SDK Telegram -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg: var(--tg-theme-bg-color, #ffffff);
+            --text: var(--tg-theme-text-color, #000000);
+            --btn: var(--tg-theme-button-color, #2a9df4);
+            --btn-text: var(--tg-theme-button-text-color, #ffffff);
+            --cell-bg: #f5f5f5;
+        }
+        [data-theme="dark"] {
+            --bg: #1c1c1e;
+            --text: #f5f5f5;
+            --cell-bg: #2c2c2e;
+        }
+        
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; box-sizing: border-box; min-height: 100vh; transition: all 0.3s ease; }
+        h1 { margin-bottom: 5px; text-align: center; }
+        .subtitle { text-align: center; opacity: 0.8; margin-bottom: 20px; font-size: 14px; }
+        
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
+        .mode-btn { padding: 8px 16px; background: var(--btn); color: var(--btn-text); border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .mode-btn.active { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 
-    #game-container {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      margin: 0;
-      box-sizing: border-box;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
+        .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 300px; height: 300px; }
+        .cell { background: var(--cell-bg); display: flex; justify-content: center; align-items: center; font-size: 48px; cursor: pointer; user-select: none; border-radius: 8px; transition: background 0.2s; }
+        .cell.used { cursor: default; background: #e0e0e0; }
+        .cell[data-theme="dark"].used { background: #3a3a3c; }
+        .cell:hover:not(.used) { background: #d0d0d0; }
+        .cell[data-theme="dark"]:hover:not(.used) { background: #4a4a4c; }
 
-    canvas {
-      display: block;
-      image-rendering: pixelated; /* чтобы не размывалось при скейле */
-    }
-
-    /* UI поверх канваса */
-    #ui-layer {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 12px;
-      box-sizing: border-box;
-    }
-
-    .score-board {
-      font-size: clamp(16px, 4vw, 24px);
-      font-weight: bold;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-      background: rgba(0,0,0,0.4);
-      padding: 6px 12px;
-      border-radius: 8px;
-    }
-
-    /* Экраны поверх всего */
-    #start-screen, #game-over-screen {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.85);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      pointer-events: auto;
-      text-align: center;
-      z-index: 10;
-    }
-
-    h2 {
-      font-size: clamp(20px, 5vw, 32px);
-      margin: 0 0 8px 0;
-    }
-
-    p {
-      font-size: clamp(14px, 3.5vw, 18px);
-      margin: 0 0 20px 0;
-      color: rgba(255,255,255,0.8);
-    }
-
-    button {
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: clamp(12px, 4vw, 20px) clamp(20px, 6vw, 30px);
-      font-size: clamp(16px, 4vw, 20px);
-      border-radius: 12px;
-      cursor: pointer;
-      font-weight: bold;
-      min-width: 140px;
-    }
-
-    button:active {
-      transform: scale(0.96);
-    }
-
-    /* Зоны управления тапом (слева/справа) */
-    .tap-zone {
-      position: absolute;
-      bottom: 0;
-      width: calc(50% - 10px);
-      height: 160px;
-      z-index: 5;
-      opacity: 0.1; /* почти невидимо, но кликабельно */
-      user-select: none;
-    }
-    .tap-left { left: 0; }
-    .tap-right { right: 0; }
-  </style>
+        .stats { text-align: center; margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.05); border-radius: 12px; width: 100%; max-width: 320px; }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 16px; }
+        
+        .share-link { word-break: break-all; background: var(--cell-bg); padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 12px; }
+        .copy-btn { margin-left: 10px; padding: 5px 8px; font-size: 12px; }
+    </style>
 </head>
 <body>
-  <div id="game-container">
-    <canvas id="gameCanvas"></canvas>
+    <h1 id="gameStatus">Выбери режим игры</h1>
+    <div class="subtitle" id="turnInfo"></div>
 
-    <!-- UI -->
-    <div id="ui-layer">
-      <div class="score-board">Счёт: <span id="scoreEl">0</span></div>
+    <div class="controls">
+        <button class="mode-btn active" onclick="startSinglePlayer()">🤖 Игра с ботом</button>
+        <button class="mode-btn" onclick="createRoom()">👥 Создать сетевую игру</button>
+        <input type="text" id="joinInput" placeholder="Код комнаты..." style="display:none; padding:8px; border-radius:8px; border:1px solid #ccc;">
+        <button id="joinBtn" onclick="joinRoom()" style="display:none;">✅ Войти</button>
     </div>
 
-    <!-- Зоны тапа (управление) -->
-    <div class="tap-zone tap-left" id="zoneLeft"></div>
-    <div class="tap-zone tap-right" id="zoneRight"></div>
+    <div class="board" id="board"></div>
+    
+    <button id="resetBtn" class="mode-btn" onclick="resetGame()" style="display:none;">Новая игра</button>
 
-    <!-- Экран старта -->
-    <div id="start-screen">
-      <h2>Subway Runner</h2>
-      <p>Тапай слева/справа или свайпай, чтобы уклоняться</p>
-      <button id="btnStart">Начать</button>
+    <div class="stats" id="statsPanel">
+        <h3>Ваша статистика (Одиночная)</h3>
+        <div class="stat-row"><span>Побед:</span><span id="wins">0</span></div>
+        <div class="stat-row"><span>Поражений:</span><span id="losses">0</span></div>
+        <div class="stat-row"><span>Ничьих:</span><span id="draws">0</span></div>
     </div>
 
-    <!-- Экран Game Over -->
-    <div id="game-over-screen" style="display:none;">
-      <h2>Game Over</h2>
-      <p>Счёт: <span id="finalScore">0</span></p>
-      <button id="btnRestart">Ещё раз</button>
+    <div id="networkInfo" style="margin-top:15px; display:none; text-align:center;">
+        <p><strong>Код комнаты:</strong> <span id="roomCode"></span></p>
+        <div class="share-link">
+            Ссылка для друга: <span id="shareUrl"></span>
+            <button class="copy-btn" onclick="copyLink()">Копировать</button>
+        </div>
     </div>
-  </div>
 
-  <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.ready();
 
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const scoreEl = document.getElementById('scoreEl');
-    const finalScore = document.getElementById('finalScore');
-    const btnStart = document.getElementById('btnStart');
-    const btnRestart = document.getElementById('btnRestart');
-    const startScreen = document.getElementById('start-screen');
-    const gameOverScreen = document.getElementById('game-over-screen');
-
-    // Адаптивные размеры
-    function resize() {
-      // Сохраняем пропорции 16:9, но не больше экрана
-      const aspect = 640 / 360;
-      let w = window.innerWidth;
-      let h = window.innerHeight;
-
-      if (w / h < aspect) {
-        h = w / aspect;
-      } else {
-        w = h * aspect;
-      }
-
-      canvas.width = Math.round(w);
-      canvas.height = Math.round(h);
-    }
-    window.addEventListener('resize', resize);
-    resize(); // первый раз
-
-    const lanes = 3;
-    let laneWidth; // будет пересчитываться при ресайзе
-
-    const playerSizeBase = 40;
-    const obstacleSizeBase = 50;
-
-    let playerLane = 1;
-    let obstacles = [];
-    let frame = 0;
-    let speed = 4;
-    let score = 0;
-    let gameActive = false;
-    let animationFrameId;
-
-    function resetGame() {
-      playerLane = 1;
-      obstacles = [];
-      frame = 0;
-      speed = 4;
-      score = 0;
-      scoreEl.textContent = score;
-      gameActive = true;
-      cancelAnimationFrame(animationFrameId);
-      loop();
-    }
-
-    function spawnObstacle() {
-      const lane = Math.floor(Math.random() * lanes);
-      const x = lane * laneWidth + laneWidth/2 - obstacleSize/2;
-      const y = -obstacleSize;
-      obstacles.push({ x, y, lane });
-    }
-
-    function update() {
-      if (!gameActive) return;
-
-      frame++;
-      if (frame % 60 === 0) speed += 0.2;
-
-      if (frame % (60 - Math.min(20, Math.floor(speed))) === 0) {
-        spawnObstacle();
-      }
-
-      for (let i = obstacles.length - 1; i >= 0; i--) {
-        obstacles[i].y += speed;
-        if (obstacles[i].y > canvas.height) {
-          obstacles.splice(i, 1);
-          score++;
-          scoreEl.textContent = score;
+        // Применяем тему TG к телу документа
+        if (tg.themeParams && tg.themeParams.bg_color.includes('1c1c1') || getComputedStyle(document.documentElement).getPropertyValue('--bg').includes('1c1c1')) {
+             document.body.setAttribute('data-theme', 'dark');
+        } else {
+             document.body.removeAttribute('data-theme');
         }
-      }
 
-      const playerX = playerLane * laneWidth + laneWidth/2 - playerSize/2;
-      const playerY = canvas.height - playerSize - 20;
+        const WIN_COMBINATIONS = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
+        ];
 
-      for (const o of obstacles) {
-        if (
-          playerX < o.x + obstacleSize &&
-          playerX + playerSize > o.x &&
-          playerY < o.y + obstacleSize &&
-          playerY + playerSize > o.y
-        ) {
-          gameOver();
-          return;
+        let board = Array(9).fill('');
+        let currentPlayer = 'X';
+        let gameActive = true;
+        let mode = 'single'; // single | host | client
+        let opponentIsBot = false;
+
+        // --- СТАТИСТИКА ---
+        function loadStats() {
+            const stats = JSON.parse(localStorage.getItem('ttt_stats')) || { wins: 0, losses: 0, draws: 0 };
+            document.getElementById('wins').textContent = stats.wins;
+            document.getElementById('losses').textContent = stats.losses;
+            document.getElementById('draws').textContent = stats.draws;
         }
-      }
-    }
+        function saveStats(stats) { localStorage.setItem('ttt_stats', JSON.stringify(stats)); }
 
-    function draw() {
-      ctx.fillStyle = '#1a1a2e';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // --- БОТ (AI) ---
+        function botMove() {
+            setTimeout(() => {
+                let bestScore = -Infinity;
+                let move;
+                for(let i = 0; i < 9; i++){
+                    if(board[i] === ''){
+                        board[i] = 'O';
+                        let score = minimax(board, 0, false);
+                        board[i] = '';
+                        if(score > bestScore){
+                            bestScore = score;
+                            move = i;
+                        }
+                    }
+                }
+                board[move] = 'O';
+                renderBoard();
+                checkEndState();
+            }, 500); // Задержка для красоты
+        }
 
-      laneWidth = canvas.width / lanes;
-      const playerSize = playerSizeBase * (canvas.height / 360);
-      const obstacleSize = obstacleSizeBase * (canvas.height / 360);
+        function minimax(newBoard, depth, isMaximizing){
+            const scores = {'X': -10, 'O': 10, 'draw': 0};
+            const result = checkWinnerRaw(newBoard);
+            if(result !== null) return scores[result];
+            
+            if(isMaximizing){
+                let best = -Infinity;
+                for(let i=0; i<9; i++){ if(newBoard[i]===''){ newBoard[i]='O'; best = Math.max(best, minimax(newBoard, depth+1, false)); newBoard[i]='';} }
+                return best;
+            } else {
+                let best = Infinity;
+                for(let i=0; i<9; i++){ if(newBoard[i]===''){ newBoard[i]='X'; best = Math.min(best, minimax(newBoard, depth+1, true)); newBoard[i]='';} }
+                return best;
+            }
+        }
 
-      // Полосы
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-      ctx.lineWidth = 2;
-      for (let l = 1; l < lanes; l++) {
-        const x = l * laneWidth;
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
+        // --- ЛОГИКА ПОЛЯ ---
+        function renderBoard(){
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            board.forEach((value, index) => {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                if(value) cell.classList.add('used');
+                cell.textContent = value;
+                if(!value && gameActive) cell.onclick = () => handleCellClick(index);
+                boardEl.appendChild(cell);
+            });
+        }
 
-      // Препятствия
-      ctx.fillStyle = '#ff4757';
-      for (const o of obstacles) {
-        ctx.fillRect(o.x, o.y, obstacleSize, obstacleSize);
-      }
+        async function handleCellClick(index){
+            if(!gameActive || board[index] !== '' || (currentPlayer !== 'X' && !opponentIsBot)) return;
+            
+            board[index] = currentPlayer;
+            renderBoard();
+            
+            // В сетевой игре отправляем ход оппоненту через WebAppData
+            if(mode === 'host'){
+                await tg.sendData(JSON.stringify({type:'move', idx:index, player:'X'}));
+            }
 
-      // Игрок
-      ctx.fillStyle = '#1dd1a1';
-      ctx.fillRect(
-        playerLane * laneWidth + laneWidth/2 - playerSize/2,
-        canvas.height - playerSize - 20,
-        playerSize,
-        playerSize
-      );
-    }
+            const winner = checkWinner();
+            if(winner || isDraw()) { checkEndState(); return; }
 
-    function loop() {
-      update();
-      draw();
-      if (gameActive) {
-        animationFrameId = requestAnimationFrame(loop);
-      }
-    }
+            currentPlayer = 'O';
+            updateTurnInfo();
 
-    function gameOver() {
-      gameActive = false;
-      finalScore.textContent = score;
-      startScreen.style.display = 'none';
-      gameOverScreen.style.display = 'flex';
-    }
+            if(opponentIsBot){
+                botMove();
+            } else if(mode === 'host'){
+                currentPlayer = 'O'; // Ждем хода клиента
+            }
+        }
 
-    function moveLane(direction) {
-      if (!gameActive) return;
-      let next = playerLane + direction;
-      if (next >= 0 && next < lanes) {
-        playerLane = next;
-      }
-    }
+        function checkWinner(){
+            for(let comb of WIN_COMBINATIONS){
+                const [a,b,c] = comb;
+                if(board[a] && board[a]===board[b] && board[a]===board[c]) return board[a];
+            }
+            return null;
+        }
+        function checkWinnerRaw(b){ for(let c of WIN_COMBINATIONS){ const [a,b1,d]=c; if(b[a]&&b[a]===b[b1]&&b[a]===b[d]) return b[a];} return null;}
+        function isDraw(){ return board.every(cell => cell !== '') && !checkWinner(); }
 
-    // Тап по зонам
-    document.getElementById('zoneLeft').addEventListener('click', () => moveLane(-1));
-    document.getElementById('zoneRight').addEventListener('click', () => moveLane(1));
+        function checkEndState(){
+            gameActive = false;
+            const winner = checkWinner();
+            if(winner){
+                document.getElementById('gameStatus').textContent = `Игрок ${winner} победил!`;
+                if(mode === 'single'){
+                    let stats = JSON.parse(localStorage.getItem('ttt_stats'));
+                    if(winner === 'X') stats.wins++; else stats.losses++;
+                    saveStats(stats); loadStats();
+                }
+                tg.sendData(JSON.stringify({status:'end', winner: winner}));
+            } else {
+                document.getElementById('gameStatus').textContent = "Ничья!";
+                if(mode === 'single'){
+                    let stats = JSON.parse(localStorage.getItem('ttt_stats')); stats.draws++; saveStats(stats); loadStats();
+                }
+                tg.sendData(JSON.stringify({status:'end', winner: 'draw'}));
+            }
+        }
 
-    // Свайпы
-    let touchStartX = 0;
-    canvas.addEventListener('touchstart', e => {
-      touchStartX = e.touches[0].clientX;
-    });
-    canvas.addEventListener('touchend', e => {
-      const touchEndX = e.changedTouches[0].clientX;
-      const diff = touchEndX - touchStartX;
-      if (diff < -40) moveLane(-1);
-      if (diff > 40) moveLane(1);
-    });
+        function resetGame(){
+            board = Array(9).fill('');
+            currentPlayer = 'X';
+            gameActive = true;
+            document.getElementById('gameStatus').textContent = opponentIsBot ? "Ваш ход (X)" : "Ожидание хода...";
+            document.getElementById('resetBtn').style.display = 'none';
+            renderBoard();
+            updateTurnInfo();
+        }
 
-    // Клавиатура
-    document.addEventListener('keydown', e => {
-      if (e.key === 'a' || e.key === 'ArrowLeft') moveLane(-1);
-      if (e.key === 'd' || e.key === 'ArrowRight') moveLane(1);
-    });
+        function updateTurnInfo(){
+            if(gameActive){
+                if(opponentIsBot){
+                    document.getElementById('turnInfo').textContent = currentPlayer === 'X' ? "Ваш ход" : "Ход бота...";
+                } else {
+                    document.getElementById('turnInfo').textContent = mode === 'host' ? (currentPlayer === 'X' ? "Ваш ход" : "Ход соперника") : (currentPlayer === 'X' ? "Ход соперника" : "Ваш ход");
+                }
+            }
+        }
 
-    btnStart.addEventListener('click', () => {
-      startScreen.style.display = 'none';
-      resetGame();
-    });
-    btnRestart.addEventListener('click', () => {
-      gameOverScreen.style.display = 'none';
-      resetGame();
-    });
-  </script>
+        // --- РЕЖИМЫ ---
+        function startSinglePlayer(){
+            mode = 'single'; opponentIsBot = true;
+            setupUIForMode();
+            resetGame();
+        }
+
+        function createRoom(){
+            mode = 'host'; opponentIsBot = false;
+            const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            window.history.pushState({}, '', `?room=${roomId}&player=X`);
+            document.getElementById('roomCode').textContent = roomId;
+            document.getElementById('shareUrl').textContent = window.location.href;
+            setupUIForMode();
+            resetGame();
+        }
+
+        function joinRoom(){
+            const code = document.getElementById('joinInput').value.trim().toUpperCase();
+            if(code.length >= 4){
+                mode = 'client'; opponentIsBot = false;
+                window.history.pushState({}, '', `?room=${code}&player=O`);
+                document.getElementById('roomCode').textContent = code;
+                setupUIForMode();
+                resetGame();
+            }
+        }
+
+        function setupUIForMode(){
+            document.querySelector('.controls').style.display = 'none';
+            document.getElementById('resetBtn').style.display = 'block';
+            document.getElementById('networkInfo').style.display = (mode === 'host' || mode === 'client') ? 'block' : 'none';
+            document.getElementById('statsPanel').style.display = (mode === 'single') ? 'block' : 'none';
+            if(mode === 'host') document.getElementById('gameStatus').textContent = "Комната создана! Ожидание игрока...";
+            if(mode === 'client') document.getElementById('gameStatus').textContent = "Вы вошли в комнату. Ожидание начала...";
+        }
+
+        function copyLink(){
+            navigator.clipboard.writeText(window.location.href);
+            alert("Ссылка скопирована!");
+        }
+
+        // --- ОБРАБОТЧИК ДАННЫХ ОТ ТГ И ОПпонЕНТА ---
+        tg.MainButton.onClick(() => {}); // На всякий случай заглушка
+
+        // Получение данных от JS (наш собственный sendData)
+        window.Telegram.WebApp.onEvent('data', async e => {
+            const data = JSON.parse(e.data);
+            if(data.type === 'move'){
+                board[data.idx] = data.player;
+                renderBoard();
+                if(checkWinner() || isDraw()) { checkEndState(); return; }
+                currentPlayer = data.player === 'X' ? 'O' : 'X';
+                updateTurnInfo();
+            }
+            if(data.status === 'end'){
+                checkEndState();
+            }
+        });
+
+        // --- ЗАПУСК ---
+        // Парсинг URL для входа в сеть
+        const params = new URLSearchParams(window.location.search);
+        if(params.has('room')){
+            const room = params.get('room');
+            const player = params.get('player');
+            document.getElementById('roomCode').textContent = room;
+            mode = player === 'X' ? 'host' : 'client';
+            opponentIsBot = false;
+            setupUIForMode();
+            if(mode === 'client') document.getElementById('gameStatus').textContent = "Присоединено к комнате " + room;
+        } else {
+            loadStats();
+        }
+    </script>
 </body>
 </html>
