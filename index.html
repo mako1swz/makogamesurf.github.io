@@ -2,8 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Крестики-Нолики</title>
-    <!-- Подключение официального SDK Telegram -->
+    <title>Крестики-Нолики TWA</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -12,8 +11,10 @@
             --btn: var(--tg-theme-button-color, #2a9df4);
             --btn-text: var(--tg-theme-button-text-color, #ffffff);
             --cell-bg: #f5f5f5;
-            --x-color: #ef4444;
-            --o-color: #22c55e;
+            --accent: #ffd700;
+            --x-gradient-start: #ff6b6b;
+            --x-gradient-end: #ee5a5a;
+            --o-ring: #4ecdc4;
             --border: rgba(0,0,0,0.1);
         }
         
@@ -22,67 +23,95 @@
             --text: #f5f5f5;
             --btn: #4a4a4c;
             --cell-bg: #2c2c2e;
+            --accent: #facc15;
+            --x-gradient-start: #ff8787;
+            --x-gradient-end: #ff5252;
+            --o-ring: #6ef3e4;
             --border: rgba(255,255,255,0.1);
         }
         
         * { box-sizing: border-box; }
         
         body { 
-            margin: 0; padding: 0; 
+            margin: 0; padding: 20px; 
             background: var(--bg); color: var(--text); 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             display: flex; flex-direction: column; align-items: center; min-height: 100vh;
             transition: all 0.3s ease;
         }
         
-        h1 { margin: 20px 0 5px; text-align: center; font-size: 24px; }
-        .subtitle { text-align: center; opacity: 0.8; margin-bottom: 20px; font-size: 14px; }
+        h1 { margin: 10px 0 5px; text-align: center; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+        .subtitle { text-align: center; opacity: 0.8; margin-bottom: 20px; font-size: 15px; }
         
         /* Панель управления */
-        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
+        .controls { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
         .mode-btn { 
-            padding: 12px 20px; background: var(--btn); color: var(--btn-text); 
-            border: none; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 600;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            padding: 14px 22px; background: var(--btn); color: var(--btn-text); 
+            border: none; border-radius: 14px; cursor: pointer; font-size: 16px; font-weight: 600;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            display: flex; align-items: center; gap: 8px;
         }
-        .mode-btn:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .mode-btn:hover { transform: scale(1.06); box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
         
         /* Игровое поле */
-        .board-wrapper { position: relative; width: 340px; height: 340px; }
+        .board-wrapper { position: relative; width: 360px; height: 360px; perspective: 1000px; }
         .board { 
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; 
-            width: 100%; height: 100%;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; 
+            width: 100%; height: 100%; border-radius: 16px; overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1), 0 5px 15px rgba(0,0,0,0.08);
+            background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+            transition: all 0.3s ease;
         }
+        [data-theme="dark"] .board { background: linear-gradient(135deg, #252527 0%, #1a1a1a 100%); }
+        
         .cell { 
-            background: var(--cell-bg); display: flex; justify-content: center; align-items: center; 
+            background: white; display: flex; justify-content: center; align-items: center; 
             border-radius: 12px; transition: background 0.2s ease; position: relative; overflow: hidden;
             border: 1px solid var(--border);
+            transform-style: preserve-3d;
         }
-        .cell.used { cursor: default; background: #e0e0e0; }
-        [data-theme="dark"] .cell.used { background: #3a3a3c; }
-        .cell:hover:not(.used) { background: #d0d0d0; }
-        [data-theme="dark"] .cell:hover:not(.used) { background: #4a4a4c; }
+        [data-theme="dark"] .cell { background: #333; border-color: #444; }
+        .cell.used { cursor: default; background: #f0f0f0; }
+        [data-theme="dark"] .cell.used { background: #2a2a2a; }
+        .cell:hover:not(.used) { background: #e6f7ff; }
+        [data-theme="dark"] .cell:hover:not(.used) { background: #1a4d66; }
         
         /* Иконки X и O */
-        .symbol { width: 40px; height: 40px; opacity: 0; animation: fadeInScale 0.3s forwards; }
-        @keyframes fadeInScale { to { opacity: 1; transform: scale(1); } from { opacity: 0; transform: scale(0.5); } }
-        .symbol.x path { stroke: var(--x-color); stroke-width: 6; fill: none; }
-        .symbol.o circle { stroke: var(--o-color); stroke-width: 6; fill: none; }
+        .symbol { width: 50px; height: 50px; opacity: 0; animation: fadeInScale 0.4s forwards cubic-bezier(0.2, 0.8, 0.2, 1); }
+        @keyframes fadeInScale { to { opacity: 1; transform: scale(1); } from { opacity: 0; transform: scale(0.6); rotateY(-180deg); } }
+        
+        .symbol.x path { 
+            fill: none; stroke-linecap: round; 
+            stroke: linear-gradient(45deg, var(--x-gradient-start), var(--x-gradient-end));
+            stroke-width: 8; 
+            filter: drop-shadow(0 0 6px var(--x-gradient-start));
+        }
+        
+        .symbol.o circle { 
+            fill: none; 
+            stroke: var(--o-ring); 
+            stroke-width: 8; 
+            stroke-dasharray: 251; /* Длина окружности ~ 2*PI*r = 2*3.14*20 */
+            stroke-dashoffset: 251;
+            animation: drawCircle 0.6s ease-out forwards;
+            filter: drop-shadow(0 0 8px var(--o-ring));
+        }
+        @keyframes drawCircle { to { stroke-dashoffset: 0; } }
 
         /* Статистика и прочее */
-        .stats { text-align: center; margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.05); border-radius: 12px; width: 100%; max-width: 320px; }
-        .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 16px; }
+        .stats { text-align: center; margin-top: 20px; padding: 20px; background: rgba(0,0,0,0.03); border-radius: 16px; width: 100%; max-width: 340px; backdrop-filter: blur(10px); }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 16px; font-weight: 500; }
         
-        .share-link { word-break: break-all; background: var(--cell-bg); padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 12px; display: flex; align-items: center; }
-        .copy-btn { margin-left: 10px; padding: 5px 8px; font-size: 12px; background: var(--btn); color: var(--btn-text); border: none; border-radius: 6px; cursor: pointer; }
+        .share-link { word-break: break-all; background: var(--cell-bg); padding: 12px; border-radius: 12px; margin-top: 10px; font-size: 13px; display: flex; align-items: center; }
+        .copy-btn { margin-left: 12px; padding: 6px 10px; font-size: 12px; background: var(--btn); color: var(--btn-text); border: none; border-radius: 8px; cursor: pointer; }
         
         #currentPlayerIndicator { 
-            text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; padding: 8px; 
-            border-radius: 8px; background: var(--btn); color: var(--btn-text); animation: pulse 2s infinite; display: none;
+            text-align: center; font-size: 19px; font-weight: bold; margin-bottom: 15px; padding: 10px; 
+            border-radius: 10px; background: var(--btn); color: var(--btn-text); animation: pulse 2s infinite; display: none;
         }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
         
-        button#resetBtn { display: none; margin-top: 10px; }
+        button#resetBtn { display: none; margin-top: 15px; padding: 14px 30px; font-size: 17px; }
         
         /* Оверлей блокировки */
         .overlay { position: absolute; inset: 0; background: transparent; z-index: 10; display: none; }
@@ -151,12 +180,17 @@
         let board = Array(9).fill('');
         let currentPlayer = 'X';
         let gameActive = true;
-        let mode = 'single'; // single | host | client | local
+        let mode = 'single'; 
         let opponentIsBot = false;
 
         // --- СТАТИСТИКА ---
         function loadStats() {
-            try { const s = JSON.parse(localStorage.getItem('ttt_stats')); document.getElementById('wins').textContent = s.wins; document.getElementById('losses').textContent = s.losses; document.getElementById('draws').textContent = s.draws; } catch(e) {}
+            try { 
+                const s = JSON.parse(localStorage.getItem('ttt_stats') || '{"w":0,"l":0,"d":0}'); 
+                document.getElementById('wins').textContent = s.wins || 0; 
+                document.getElementById('losses').textContent = s.losses || 0; 
+                document.getElementById('draws').textContent = s.draws || 0; 
+            } catch(e) {}
         }
         function saveStats(s) { localStorage.setItem('ttt_stats', JSON.stringify(s)); }
 
@@ -165,25 +199,61 @@
             document.getElementById('boardOverlay').style.display = 'block';
             setTimeout(() => {
                 let bestScore = -Infinity, move = null;
-                for(let i=0; i<9; i++){ if(board[i]===''){ board[i]='O'; let score = minimax(board, 0, false); board[i]=''; if(score > bestScore){ bestScore = score; move = i; }}}
-                if(move !== null){ board[move] = 'O'; renderBoard(); checkEndState(); }
+                for(let i=0; i<9; i++){ 
+                    if(board[i]===''){ 
+                        board[i]='O'; 
+                        let score = minimax(board, 0, false); 
+                        board[i]='';
+                        if(score > bestScore){ bestScore = score; move = i; }
+                    }
+                }
+                if(move !== null){ 
+                    board[move] = 'O'; 
+                    renderBoard(); 
+                    checkEndState(); 
+                }
                 document.getElementById('boardOverlay').style.display = 'none';
-            }, 400);
+            }, 500);
         }
         function minimax(b, d, isMax){
-            const scores = {'X': -10, 'O': 10, 'draw': 0}; const res = checkWinnerRaw(b); if(res) return scores[res];
-            if(isMax){ let best=-Infinity; for(let i=0;i<9;i++){if(b[i]===''){b[i]='O'; best=Math.max(best,minimax(b,d+1,false)); b[i]='';} } return best;}
-            else { let best=Infinity; for(let i=0;i<9;i++){if(b[i]===''){b[i]='X'; best=Math.min(best,minimax(b,d+1,true)); b[i]='';} } return best;}
+            const scores = {'X': -10, 'O': 10, 'draw': 0}; 
+            const res = checkWinnerRaw(b); 
+            if(res) return scores[res];
+            if(b.every(c=>c!=='') && !res) return 0;
+            
+            if(isMax){ 
+                let best=-Infinity; 
+                for(let i=0;i<9;i++){if(b[i]===''){b[i]='O'; best=Math.max(best,minimax(b,d+1,false)); b[i]='';} } 
+                return best;
+            } else { 
+                let best=Infinity; 
+                for(let i=0;i<9;i++){if(b[i]===''){b[i]='X'; best=Math.min(best,minimax(b,d+1,true)); b[i]='';} } 
+                return best;
+            }
         }
 
         // --- РЕНДЕРИНГ ---
         function renderBoard(){
-            const el = document.getElementById('board'); el.innerHTML = '<div class="overlay" id="boardOverlay"></div>';
+            const el = document.getElementById('board'); 
+            el.innerHTML = '<div class="overlay" id="boardOverlay"></div>';
             board.forEach((v, i) => {
                 const c = document.createElement('div'); c.classList.add('cell');
-                if(v){ c.classList.add('used'); const svg=document.createElementNS("http://www.w3.org/2000/svg", 'svg'); svg.classList.add('symbol');
-                    if(v==='X'){const p=document.createElementNS("http://www.w3.org/2000/svg", 'path'); p.setAttribute('d','M8 8 L32 32 M8 32 L32 8'); svg.appendChild(p);}
-                    else{const ci=document.createElementNS("http://www.w3.org/2000/svg", 'circle'); ci.setAttribute('cx','20'); ci.setAttribute('cy','20'); ci.setAttribute('r','12'); svg.appendChild(ci);} c.appendChild(svg); }
+                if(v){ 
+                    c.classList.add('used'); 
+                    const svg=document.createElementNS("http://www.w3.org/2000/svg", 'svg'); 
+                    svg.classList.add('symbol');
+                    
+                    if(v==='X'){
+                        const p=document.createElementNS("http://www.w3.org/2000/svg", 'path'); 
+                        p.setAttribute('d','M12 12 L38 38 M12 38 L38 12'); 
+                        svg.appendChild(p);
+                    } else {
+                        const ci=document.createElementNS("http://www.w3.org/2000/svg", 'circle'); 
+                        ci.setAttribute('cx','25'); ci.setAttribute('cy','25'); ci.setAttribute('r','20'); 
+                        svg.appendChild(ci);
+                    }
+                    c.appendChild(svg); 
+                }
                 if(!v && gameActive) c.onclick = () => handleCellClick(i);
                 el.appendChild(c);
             });
@@ -192,39 +262,84 @@
         // --- ЛОГИКА ХОДОВ ---
         async function handleCellClick(index){
             if(!gameActive || board[index] !== '' || (currentPlayer !== 'X' && !opponentIsBot && mode !== 'local')) return;
-            board[index] = currentPlayer; renderBoard(); playSound('click');
             
-            if(mode === 'host') await tg.sendData(JSON.stringify({type:'move', idx:index, player:'X'}));
+            board[index] = currentPlayer; 
+            renderBoard(); 
+            playSound('click');
+            
+            if(mode === 'host'){
+                await tg.sendData(JSON.stringify({type:'move', idx:index, player:'X'}));
+            }
 
             const winner = checkWinner();
-            if(winner) { checkEndState(); return; }
-            if(isDraw()) { checkEndState(); return; }
+            if(winner) { 
+                checkEndState(); 
+                return; 
+            }
+            if(isDraw()) { 
+                checkEndState(); 
+                return; 
+            }
 
-            currentPlayer = 'O'; updateTurnInfo();
+            currentPlayer = 'O'; 
+            updateTurnInfo();
+
             if(opponentIsBot) botMove();
         }
 
-        function checkWinner(){ for(let c of WIN_COMBINATIONS){ const [a,b,d]=c; if(board[a]&&board[a]===board[b]&&board[a]===board[d]) return board[a];} return null; }
-        function checkWinnerRaw(b){ for(let c of WIN_COMBINATIONS){ const [a,b1,d]=c; if(b[a]&&b[a]===b[b1]&&b[a]===b[d]) return b[a];} return null; }
+        function checkWinner(){ 
+            for(let c of WIN_COMBINATIONS){ 
+                const [a,b,d]=c; 
+                if(board[a]&&board[a]===board[b]&&board[a]===board[d]) return board[a];
+            } 
+            return null; 
+        }
+        function checkWinnerRaw(b){ 
+            for(let c of WIN_COMBINATIONS){ 
+                const [a,b1,d]=c; 
+                if(b[a]&&b[a]===b[b1]&&b[a]===b[d]) return b[a];
+            } 
+            return null; 
+        }
         function isDraw(){ return board.every(cell => cell !== '') && !checkWinner(); }
 
         function checkEndState(){
-            gameActive = false; const w = checkWinner();
-            if(w){ document.getElementById('gameStatus').textContent = `Игрок ${w} победил!`; playSound(w==='X'?'win':'lose');
-                if(mode==='single'){ let s=JSON.parse(localStorage.getItem('ttt_stats')||'{}'); if(w==='X') s.wins++; else s.losses++; saveStats(s||{}); loadStats();}
+            gameActive = false; 
+            const w = checkWinner();
+            if(w){ 
+                document.getElementById('gameStatus').textContent = `Игрок ${w} победил!`; 
+                playSound(w==='X'?'win':'lose');
+                
+                if(mode==='single'){ 
+                    let s=JSON.parse(localStorage.getItem('ttt_stats')||'{}'); 
+                    if(w==='X') s.wins=(s.wins||0)+1; else s.losses=(s.losses||0)+1; 
+                    saveStats(s); loadStats();
+                }
                 tg.sendData(JSON.stringify({status:'end', winner: w}));
-            } else { document.getElementById('gameStatus').textContent = "Ничья!"; playSound('draw');
-                if(mode==='single'){ let s=JSON.parse(localStorage.getItem('ttt_stats')||'{}'); s.draws++; saveStats(s||{}); loadStats(); }
+            } else { 
+                document.getElementById('gameStatus').textContent = "Ничья!"; 
+                playSound('draw');
+                if(mode==='single'){ 
+                    let s=JSON.parse(localStorage.getItem('ttt_stats')||'{}'); 
+                    s.draws=(s.draws||0)+1; 
+                    saveStats(s); loadStats();
+                }
                 tg.sendData(JSON.stringify({status:'end', winner: 'draw'}));
             }
-            document.getElementById('resetBtn').style.display = 'block'; document.getElementById('currentPlayerIndicator').style.display = 'none';
+            document.getElementById('resetBtn').style.display = 'block'; 
+            document.getElementById('currentPlayerIndicator').style.display = 'none';
         }
 
         function resetGame(){
-            board = Array(9).fill(''); currentPlayer = 'X'; gameActive = true;
+            board = Array(9).fill(''); 
+            currentPlayer = 'X'; 
+            gameActive = true;
             document.getElementById('gameStatus').textContent = opponentIsBot ? "Ваш ход (X)" : "Ожидание хода...";
-            document.getElementById('resetBtn').style.display = 'none'; document.getElementById('currentPlayerIndicator').style.display = 'block';
-            document.getElementById('playerSymbol').textContent = 'X'; renderBoard(); updateTurnInfo();
+            document.getElementById('resetBtn').style.display = 'none'; 
+            document.getElementById('currentPlayerIndicator').style.display = 'block';
+            document.getElementById('playerSymbol').textContent = 'X'; 
+            renderBoard(); 
+            updateTurnInfo();
         }
 
         function updateTurnInfo(){
@@ -257,16 +372,26 @@
 
         // --- ОБРАБОТЧИК ДАННЫХ TELEGRAM ---
         tg.MainButton.onClick(() => {});
-        window.Telegram.WebApp.onEvent('data', e => { const data=JSON.parse(e.data);
-            if(data.type === 'move'){ board[data.idx] = data.player; renderBoard(); if(checkWinner()||isDraw()){ checkEndState(); return; } currentPlayer = data.player === 'X' ? 'O' : 'X'; updateTurnInfo(); }
+        window.Telegram.WebApp.onEvent('data', e => { 
+            const data=JSON.parse(e.data);
+            if(data.type === 'move'){ 
+                board[data.idx] = data.player; 
+                renderBoard(); 
+                if(checkWinner()||isDraw()){ checkEndState(); return; } 
+                currentPlayer = data.player === 'X' ? 'O' : 'X'; 
+                updateTurnInfo(); 
+            }
             if(data.status === 'end'){ checkEndState(); }
         });
 
         // --- ЗАПУСК ---
         const params = new URLSearchParams(window.location.search);
         if(params.has('room')){
-            const room=params.get('room'), player=params.get('player'); document.getElementById('roomCode').textContent = room;
-            mode = player === 'X' ? 'host' : 'client'; opponentIsBot = false; setupUIForMode();
+            const room=params.get('room'), player=params.get('player'); 
+            document.getElementById('roomCode').textContent = room;
+            mode = player === 'X' ? 'host' : 'client'; 
+            opponentIsBot = false; 
+            setupUIForMode();
             if(mode === 'client') document.getElementById('gameStatus').textContent = "Присоединено к комнате " + room;
             resetGame();
         } else {
