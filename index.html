@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Subway-like Runner</title>
+  <title>Subway Runner</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
@@ -20,21 +20,24 @@
       overflow: hidden;
       touch-action: none;
     }
+
     #game-container {
       position: relative;
-      width: 640px;
-      height: 360px;
-      margin: auto;
-      border: 2px solid rgba(255,255,255,0.1);
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
       box-sizing: border-box;
-      user-select: none;
-      -webkit-user-select: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
+
     canvas {
       display: block;
-      width: 100%;
-      height: 100%;
+      image-rendering: pixelated; /* чтобы не размывалось при скейле */
     }
+
+    /* UI поверх канваса */
     #ui-layer {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -45,11 +48,17 @@
       padding: 12px;
       box-sizing: border-box;
     }
+
     .score-board {
-      font-size: 20px;
+      font-size: clamp(16px, 4vw, 24px);
       font-weight: bold;
       text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.4);
+      padding: 6px 12px;
+      border-radius: 8px;
     }
+
+    /* Экраны поверх всего */
     #start-screen, #game-over-screen {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -60,36 +69,67 @@
       justify-content: center;
       pointer-events: auto;
       text-align: center;
+      z-index: 10;
     }
+
+    h2 {
+      font-size: clamp(20px, 5vw, 32px);
+      margin: 0 0 8px 0;
+    }
+
+    p {
+      font-size: clamp(14px, 3.5vw, 18px);
+      margin: 0 0 20px 0;
+      color: rgba(255,255,255,0.8);
+    }
+
     button {
       background: var(--accent);
       color: white;
       border: none;
-      padding: 14px 28px;
-      font-size: 18px;
-      border-radius: 8px;
+      padding: clamp(12px, 4vw, 20px) clamp(20px, 6vw, 30px);
+      font-size: clamp(16px, 4vw, 20px);
+      border-radius: 12px;
       cursor: pointer;
-      margin-top: 16px;
       font-weight: bold;
+      min-width: 140px;
     }
+
     button:active {
       transform: scale(0.96);
     }
+
+    /* Зоны управления тапом (слева/справа) */
+    .tap-zone {
+      position: absolute;
+      bottom: 0;
+      width: calc(50% - 10px);
+      height: 160px;
+      z-index: 5;
+      opacity: 0.1; /* почти невидимо, но кликабельно */
+      user-select: none;
+    }
+    .tap-left { left: 0; }
+    .tap-right { right: 0; }
   </style>
 </head>
 <body>
   <div id="game-container">
-    <canvas id="gameCanvas" width="640" height="360"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
+    <!-- UI -->
     <div id="ui-layer">
       <div class="score-board">Счёт: <span id="scoreEl">0</span></div>
-      <!-- сюда можно добавить ещё UI при необходимости -->
     </div>
+
+    <!-- Зоны тапа (управление) -->
+    <div class="tap-zone tap-left" id="zoneLeft"></div>
+    <div class="tap-zone tap-right" id="zoneRight"></div>
 
     <!-- Экран старта -->
     <div id="start-screen">
       <h2>Subway Runner</h2>
-      <p>Двигайся влево/вправо, избегай препятствий</p>
+      <p>Тапай слева/справа или свайпай, чтобы уклоняться</p>
       <button id="btnStart">Начать</button>
     </div>
 
@@ -110,19 +150,37 @@
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('scoreEl');
     const finalScore = document.getElementById('finalScore');
-
     const btnStart = document.getElementById('btnStart');
     const btnRestart = document.getElementById('btnRestart');
     const startScreen = document.getElementById('start-screen');
     const gameOverScreen = document.getElementById('game-over-screen');
 
-    // Параметры мира
-    const lanes = 3;
-    const laneWidth = canvas.width / lanes;
-    const playerSize = 40;
-    const obstacleSize = 50;
+    // Адаптивные размеры
+    function resize() {
+      // Сохраняем пропорции 16:9, но не больше экрана
+      const aspect = 640 / 360;
+      let w = window.innerWidth;
+      let h = window.innerHeight;
 
-    let playerLane = 1; // центральная полоса
+      if (w / h < aspect) {
+        h = w / aspect;
+      } else {
+        w = h * aspect;
+      }
+
+      canvas.width = Math.round(w);
+      canvas.height = Math.round(h);
+    }
+    window.addEventListener('resize', resize);
+    resize(); // первый раз
+
+    const lanes = 3;
+    let laneWidth; // будет пересчитываться при ресайзе
+
+    const playerSizeBase = 40;
+    const obstacleSizeBase = 50;
+
+    let playerLane = 1;
     let obstacles = [];
     let frame = 0;
     let speed = 4;
@@ -144,7 +202,6 @@
 
     function spawnObstacle() {
       const lane = Math.floor(Math.random() * lanes);
-      // немного смещаем, чтобы не спавнились ровно по центру
       const x = lane * laneWidth + laneWidth/2 - obstacleSize/2;
       const y = -obstacleSize;
       obstacles.push({ x, y, lane });
@@ -154,18 +211,14 @@
       if (!gameActive) return;
 
       frame++;
-      // Увеличение сложности
       if (frame % 60 === 0) speed += 0.2;
 
-      // Спавн препятствий
       if (frame % (60 - Math.min(20, Math.floor(speed))) === 0) {
         spawnObstacle();
       }
 
-      // Движение препятствий
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].y += speed;
-        // Удаление ушедших вниз
         if (obstacles[i].y > canvas.height) {
           obstacles.splice(i, 1);
           score++;
@@ -173,9 +226,8 @@
         }
       }
 
-      // Коллизии
       const playerX = playerLane * laneWidth + laneWidth/2 - playerSize/2;
-      const playerY = canvas.height - playerSize - 20; // чуть выше низа
+      const playerY = canvas.height - playerSize - 20;
 
       for (const o of obstacles) {
         if (
@@ -194,7 +246,11 @@
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Дорожка (три полосы)
+      laneWidth = canvas.width / lanes;
+      const playerSize = playerSizeBase * (canvas.height / 360);
+      const obstacleSize = obstacleSizeBase * (canvas.height / 360);
+
+      // Полосы
       ctx.strokeStyle = 'rgba(255,255,255,0.15)';
       ctx.lineWidth = 2;
       for (let l = 1; l < lanes; l++) {
@@ -236,7 +292,6 @@
       gameOverScreen.style.display = 'flex';
     }
 
-    // Управление
     function moveLane(direction) {
       if (!gameActive) return;
       let next = playerLane + direction;
@@ -245,7 +300,11 @@
       }
     }
 
-    // Тач-управление
+    // Тап по зонам
+    document.getElementById('zoneLeft').addEventListener('click', () => moveLane(-1));
+    document.getElementById('zoneRight').addEventListener('click', () => moveLane(1));
+
+    // Свайпы
     let touchStartX = 0;
     canvas.addEventListener('touchstart', e => {
       touchStartX = e.touches[0].clientX;
@@ -253,8 +312,8 @@
     canvas.addEventListener('touchend', e => {
       const touchEndX = e.changedTouches[0].clientX;
       const diff = touchEndX - touchStartX;
-      if (diff < -50) moveLane(-1); // влево
-      if (diff > 50) moveLane(1);   // вправо
+      if (diff < -40) moveLane(-1);
+      if (diff > 40) moveLane(1);
     });
 
     // Клавиатура
